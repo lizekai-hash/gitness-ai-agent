@@ -16,6 +16,7 @@
 
 /* eslint-disable */
 // This is an auto-generated file
+export declare const backButton: string
 export declare const banners: string
 export declare const btnColorFix: string
 export declare const main: string
