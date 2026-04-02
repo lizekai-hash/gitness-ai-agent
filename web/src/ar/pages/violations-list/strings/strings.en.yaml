@@ -1,0 +1,57 @@
+page: Violations List Page
+noViolationsFound: No Violations Found
+evaluatedAt: 'Evaluated At {{value}}'
+cards:
+  totalViolations: Total Violations
+  blockedViolations: Blocked Violations
+  warningViolations: Warning Violations
+  dependencies: Dependencies
+table:
+  columns:
+    package: Dependency And Version
+    registry: Upstream Proxy
+    policySet: Policy Set Violated
+    status: Status
+    lastEvaluatedAt: Evaluated At
+    actions:
+      violationDetails: Violation Details
+violationDetailsModal:
+  title: Violation Details
+  basicInformationSection:
+    title: Basic Information
+    packageName: Package Name
+    upstreamProxy: Upstream Proxy
+    status: Status
+    policySetViolated: Policy Set Violated
+  violatedPoliciesSection:
+    policySetViolated: Policy Set Violated
+    policiesViolated: Policies Violated
+    policyViolated: Policy Violated
+    policyName: 'Policy Name: {{{policyName}}}'
+    category: Category
+    title: Violated Policies
+    ossRiskLevelViolation:
+      ossRiskLevel: OSS Risk Level
+    packageAgeViolation:
+      packageAgeThreshold: Package Age Threshold
+      publishedOn: Published On
+    licenseViolation:
+      allowedLicenses: Allowed Licenses
+      blockedLicense: Blocked License
+      packageLicense: Package License
+    securityViolation:
+      cveId: CVE ID
+      cvssScore: CVSS Score
+      cvssThreshold: CVSS Threshold
+  fixInformationSection:
+    title: Fix Information
+    fixAvailable: Fix Available
+    fixedVersion: Fixed Version
+    currentVersion: Current Version
+  evaluationDetailsSection:
+    title: Evaluation
+    firstDetected: First Detected
+    lastDetected: Last Detected
+  actions:
+    requestException: Request Exception
+    reEvaluate: Re-Evaluate
