@@ -417,6 +417,82 @@ Changed files:
     }
 
 
+# ── ChatAgent（/chat 交互式优化）──────────────────────────────
+def chat_node(state: PipelineState, chat_message: str, on_chunk=None) -> dict:
+    """
+    /chat 命令触发的交互式优化节点。
+    结合审查反馈 + 用户追加指令，驱动 CodeAgent 再次优化代码。
+    """
+    requirement = state["requirement"]
+    review_text = state.get("review_text", "")
+    must_fix = state.get("review_must_fix", [])
+    work_dir = Path(state["work_dir"])
+
+    # 如果 work_dir 不存在（被清理），重建临时目录
+    if not work_dir.exists():
+        work_dir.mkdir(parents=True, exist_ok=True)
+        _setup_workdir(str(work_dir))
+
+    parts = [f"Original requirement: {requirement}"]
+    if must_fix:
+        parts.append("Code review issues:\n" + "\n".join(f"- {i}" for i in must_fix))
+    elif review_text:
+        parts.append(f"Code review feedback:\n{review_text[:2000]}")
+    parts.append(f"User instruction: {chat_message}")
+    parts.append("Output COMPLETE optimized files using ### FILE: format.")
+
+    prompt = "\n\n".join(parts)
+
+    t0 = time.time()
+    print(f"  [ChatAgent] 开始优化 (timeout={CODE_TIMEOUT}s)", flush=True)
+    result = call_deepseek(
+        prompt,
+        system=CODE_SYSTEM_PROMPT,
+        timeout=CODE_TIMEOUT,
+        on_chunk=on_chunk,
+    )
+    elapsed = time.time() - t0
+    print(f"  [ChatAgent] 完成, elapsed={elapsed:.0f}s, error={result['error']}", flush=True)
+
+    if result["error"]:
+        return {"code_output": "", "error": f"ChatAgent 失败: {result['error']}"}
+
+    content = result["result"]
+
+    for cont_round in range(1, MAX_CONTINUATIONS + 1):
+        if not _is_truncated(content):
+            break
+        print(f"  [ChatAgent] 检测到截断，发起续写 ({cont_round}/{MAX_CONTINUATIONS})", flush=True)
+        if on_chunk:
+            on_chunk("\n")
+        tail = content[-1500:]
+        cont_prompt = f"The code was cut off. Continue from:\n```\n{tail}\n```\nOutput ONLY remaining code."
+        cont_result = call_deepseek(
+            cont_prompt, system=CONTINUE_SYSTEM_PROMPT,
+            timeout=CODE_TIMEOUT, on_chunk=on_chunk,
+        )
+        if cont_result["error"]:
+            break
+        content += "\n" + cont_result["result"]
+
+    blocks = parse_file_blocks(content)
+    if not blocks:
+        return {"code_output": content, "changed_files": [], "error": "未能从输出中解析到代码文件"}
+
+    if len(blocks) == 1 and blocks[0]["path"] == "__single_block__":
+        blocks[0]["path"] = "main.py"
+
+    written = write_files(blocks, work_dir)
+    print(f"  [ChatAgent] 写入 {len(written)} 个文件: {written}", flush=True)
+    changed = _detect_changed_files(work_dir)
+
+    return {
+        "code_output": content,
+        "changed_files": changed if changed else written,
+        "error": "",
+    }
+
+
 # ── Delivery 节点 ──────────────────────────────────────────────
 def _get_repo_ref(state: PipelineState) -> str:
     repo_path = state.get("repo_url", "").replace(f"{HARNESS_BASE}/git/", "").replace(".git", "")
@@ -561,6 +637,7 @@ def run_pipeline(
     repo_url: str = "",
     repo_path: str = "",
     on_chunk=None,
+    keep_workdir: bool = False,
 ) -> str | None:
     """
     完整的多智能体管线。
@@ -605,11 +682,14 @@ def run_pipeline(
     try:
         return _execute_pipeline(bus, run_id, requirement, initial_state, on_chunk)
     finally:
-        try:
-            shutil.rmtree(work_dir, ignore_errors=True)
-            print(f"  [Cleanup] 已清理临时目录: {work_dir}", flush=True)
-        except Exception:
-            pass
+        if not keep_workdir:
+            try:
+                shutil.rmtree(work_dir, ignore_errors=True)
+                print(f"  [Cleanup] 已清理临时目录: {work_dir}", flush=True)
+            except Exception:
+                pass
+        else:
+            print(f"  [Cleanup] 保留工作目录供 /chat 使用: {work_dir}", flush=True)
 
 
 def _make_stage_cb(on_chunk, stage: str):
@@ -729,17 +809,22 @@ def _execute_pipeline(bus: EventBus, run_id: str, requirement: str,
 # ── 手动调用单个 Agent ─────────────────────────────────────────
 def invoke_agent(agent_name: str, state: dict, on_chunk=None, arg: str = "") -> dict:
     """
-    手动调用单个 Agent。供 /code /review /plan 命令使用。
+    手动调用单个 Agent。供 /code /review /plan /chat 命令使用。
 
     Args:
-        agent_name: "code", "review", "plan"
+        agent_name: "code", "review", "plan", "chat"
         state: 当前 pipeline state
         on_chunk: 流式回调
-        arg: 额外参数（如自定义 prompt）
+        arg: 额外参数（/chat 时为用户消息，/code|/plan 时覆盖 requirement）
 
     Returns:
         agent 结果 dict
     """
+    if agent_name == "chat":
+        if not arg:
+            return {"error": "用法: /chat <优化描述>"}
+        return chat_node(state, chat_message=arg, on_chunk=_make_stage_cb(on_chunk, "code"))
+
     if arg:
         state = {**state, "requirement": arg}
 

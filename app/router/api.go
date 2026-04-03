@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/harness/gitness/app/api/controller/check"
 	"github.com/harness/gitness/app/api/controller/connector"
@@ -91,8 +92,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/rs/zerolog/hlog"
-
-	"strings"
 )
 
 var (
@@ -1011,7 +1010,7 @@ func repoPathNormalizer(next http.Handler) http.Handler {
 			urlPath = r.URL.RawPath
 		}
 
-		if strings.HasPrefix(urlPath, reposPrefix) {
+		if strings.HasPrefix(urlPath, reposPrefix) { //nolint:nestif
 			remaining := urlPath[len(reposPrefix):]
 			if !strings.Contains(remaining, "/+") {
 				for _, suffix := range knownSuffixes {

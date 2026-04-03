@@ -81,6 +81,7 @@ def _strip_frontmatter(text: str) -> str:
 
 def _parse_frontmatter(text: str) -> dict:
     """简易解析 YAML frontmatter 为 dict。"""
+    
     m = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.DOTALL)
     if not m:
         return {}

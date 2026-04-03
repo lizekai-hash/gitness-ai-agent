@@ -42,7 +42,7 @@ func (s *Service) Summary(
 	defaultBranch, err := s.git.GetDefaultBranch(ctx, repoPath)
 	if err != nil {
 		// if the default branch can't be determined, return empty summary instead of error
-		return SummaryOutput{}, nil
+		return SummaryOutput{}, nil //nolint:nilerr
 	}
 	defaultBranchRef := api.GetReferenceFromBranchName(defaultBranch)
 
