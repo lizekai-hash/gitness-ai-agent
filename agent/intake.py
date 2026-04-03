@@ -331,6 +331,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .toast{position:fixed;top:12px;right:12px;padding:8px 16px;border-radius:6px;color:#fff;font-size:12px;z-index:999;display:none;animation:fadeIn .3s}
 .toast.show{display:block}.toast.success{background:#059669}.toast.error{background:#dc2626}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1}}
+.btn-chat{background:#0e7490;color:#fff;border:none}.btn-chat:hover{background:#0891b2}
+.btn-chat.active{background:#0891b2;box-shadow:0 0 0 2px #22d3ee}
+.chat-bar{display:flex;align-items:center;gap:8px;padding:6px 16px;background:#0c1929;border-top:1px solid #164e63;flex-shrink:0}
+.chat-input{flex:1;background:#0f172a;color:#e2e8f0;border:1px solid #164e63;border-radius:5px;padding:5px 10px;font-size:12px;outline:none;font-family:inherit}
+.chat-input:focus{border-color:#22d3ee}
+.btn-chat-send{background:#0e7490;color:#fff;border:none;padding:5px 14px;border-radius:5px;font-size:12px;cursor:pointer;white-space:nowrap}.btn-chat-send:hover{background:#0891b2}
 </style></head>
 <body>
 <div class="top-bar">
@@ -371,10 +377,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <button class="btn btn-cmd" onclick="sendCmd('/code')">Code</button>
         <button class="btn btn-cmd" onclick="sendCmd('/review')">Review</button>
         <button class="btn btn-cmd" onclick="sendCmd('/status')">Status</button>
+        <button class="btn btn-chat" id="chatBtn" onclick="toggleChatInput()" title="Chat with agent after review">Chat</button>
         <div class="term-tabs">
           <div class="term-tab active" onclick="switchTab('agent')">Agent</div>
           <div class="term-tab" onclick="switchTab('shell')">Shell</div>
         </div>
+      </div>
+      <div class="chat-bar" id="chatBar" style="display:none">
+        <input id="chatInput" class="chat-input" type="text" placeholder="基于 Review 反馈，告诉 Agent 如何优化代码... (Enter 发送)" autocomplete="off"/>
+        <button class="btn btn-chat-send" onclick="doSendChat()">发送</button>
       </div>
       <div class="terminal-area">
         <div class="term-pane active" id="paneAgent"></div>
@@ -595,6 +606,29 @@ function setStage(n,s){const el=document.querySelector('.stage[data-stage="'+n+'
 function setArrow(i,s){const el=document.querySelector('.arrow[data-arrow="'+i+'"]');if(el)el.className='arrow '+s}
 function escTermText(s){return s.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function toggleChatInput(){
+  const bar=document.getElementById('chatBar');
+  const btn=document.getElementById('chatBtn');
+  const visible=bar.style.display!=='none'&&bar.style.display!=='';
+  bar.style.display=visible?'none':'flex';
+  btn.classList.toggle('active',!visible);
+  if(!visible){document.getElementById('chatInput').focus()}
+}
+
+function doSendChat(){
+  const inp=document.getElementById('chatInput');
+  const msg=inp.value.trim();
+  if(!msg){toast('请输入优化指令','error');return}
+  if(!activeRunId){toast('No active pipeline','error');return}
+  sendCmd('/chat '+msg);
+  agentTerm.write('\\r\\n\\x1b[36m[Chat]\\x1b[0m \\x1b[2m'+escTermText(msg)+'\\x1b[0m\\r\\n');
+  inp.value='';
+}
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&document.activeElement===document.getElementById('chatInput')){doSendChat()}
+});
 
 loadRepos();setInterval(loadRepos,10000);
 </script>

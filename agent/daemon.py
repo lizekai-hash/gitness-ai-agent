@@ -70,6 +70,53 @@ def _handle_command(run_id: str, cmd: str) -> str:
         threading.Thread(target=_invoke, daemon=True).start()
         return f"[Agent] 正在调用 {name[1:]}Agent..."
 
+    if name == "/chat":
+        if not arg:
+            return "[Agent] 用法: /chat <优化描述>  例如: /chat 优化性能并增加错误处理"
+        if not state:
+            return "[Agent] 错误: 当前无 Pipeline 状态，请先 Trigger 一个仓库"
+        run_info = intake._runs.get(run_id, {})
+        if run_info.get("status") == "running":
+            return "[Agent] 错误: Pipeline 正在运行中，请先 /abort"
+
+        def _chat():
+            run_info = intake._runs.get(run_id, {})
+            run_info["status"] = "running"
+
+            def on_chunk(stage, text):
+                ws_server.broadcast_chunk(run_id, stage, text)
+
+            ws_server.broadcast_event(run_id, {
+                "event_type": "chat.started",
+                "text": f"[ChatAgent] 根据 Review 反馈开始优化: {arg}\r\n",
+            })
+            try:
+                result = pipeline.invoke_agent("chat", state, on_chunk=on_chunk, arg=arg)
+                if result and not result.get("error"):
+                    state.update(result)
+                    ws_server.set_run_state(run_id, state)
+                    files = result.get("changed_files", [])
+                    ws_server.broadcast_event(run_id, {
+                        "event_type": "chat.done",
+                        "text": f"[ChatAgent] 优化完成，修改了 {len(files)} 个文件: {files}\r\n",
+                    })
+                else:
+                    err = result.get("error", "未知错误") if result else "未知错误"
+                    ws_server.broadcast_event(run_id, {
+                        "event_type": "chat.failed",
+                        "text": f"[ChatAgent] 失败: {err}\r\n",
+                    })
+            except Exception as e:
+                ws_server.broadcast_event(run_id, {
+                    "event_type": "chat.failed",
+                    "text": f"[ChatAgent] 异常: {e}\r\n",
+                })
+            finally:
+                run_info["status"] = "done"
+
+        threading.Thread(target=_chat, daemon=True).start()
+        return "[Agent] ChatAgent 已启动，正在根据 Review 反馈优化代码..."
+
     return f"[Agent] 未知命令: {name}  (输入 /help 查看帮助)"
 
 
@@ -94,6 +141,7 @@ def run_pipeline(run_id: str, requirement: str, repo_path: str = ""):
         pr_url = pipeline.run_pipeline(
             bus, run_id, requirement, repo_path=repo_path,
             on_chunk=on_chunk,
+            keep_workdir=True,
         )
 
         intake._runs[run_id]["status"] = "done"

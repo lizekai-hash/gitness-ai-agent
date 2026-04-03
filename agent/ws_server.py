@@ -86,7 +86,7 @@ async def _agent_handler(ws, run_id: str):
     welcome = json.dumps({
         "type": "system",
         "text": f"[Agent Terminal] 已连接到 Pipeline {run_id}\r\n"
-                "可用命令: /code /review /plan /abort /status /help\r\n"
+                "可用命令: /code /review /plan /chat /abort /status /help\r\n"
     }, ensure_ascii=False)
     await ws.send(welcome)
     try:
@@ -110,6 +110,7 @@ async def _agent_handler(ws, run_id: str):
                         "  /code [prompt]  — 手动触发 CodeAgent\r\n"
                         "  /review         — 手动触发 ReviewAgent\r\n"
                         "  /plan [req]     — 手动触发 PlanAgent\r\n"
+                        "  /chat <msg>     — Review 后交互优化（结合审查反馈 + 追加指令）\r\n"
                         "  /abort          — 中断当前 Pipeline\r\n"
                         "  /status         — 查看当前状态\r\n"
                     )
