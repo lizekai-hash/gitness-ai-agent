@@ -1010,7 +1010,7 @@ func repoPathNormalizer(next http.Handler) http.Handler {
 			urlPath = r.URL.RawPath
 		}
 
-		if strings.HasPrefix(urlPath, reposPrefix) {
+		if strings.HasPrefix(urlPath, reposPrefix) { //nolint:nestif
 			remaining := urlPath[len(reposPrefix):]
 			if !strings.Contains(remaining, "/+") {
 				for _, suffix := range knownSuffixes {
