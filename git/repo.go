@@ -551,7 +551,7 @@ func setupGitHook(hookPath, hookName, gitHookBinary string) error {
 
 	script := fmt.Sprintf("#!/bin/sh\nexec '%s' hooks %s \"$@\"\n", unixPath, hookName)
 
-	if err = os.WriteFile(hookPath, []byte(script), 0o755); err != nil { //nolint:gosec // hook scripts require executable permission
+	if err = os.WriteFile(hookPath, []byte(script), 0o755); err != nil { //nolint:gosec
 		return errors.Internalf(err, "failed to create hook script for '%s' at '%s'",
 			hookName, hookPath)
 	}
